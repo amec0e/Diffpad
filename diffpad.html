@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DiffPad</title>
+  <link rel="stylesheet" href="diffpad.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- TITLE BAR -->
+  <header id="titlebar">
+    <button id="sidebar-toggle" onclick="toggleSidebar()" title="Changes list">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v1.5H1zm0 4h14v1.5H1zm0 4h14v1.5H1z"/></svg>
+    </button>
+    <div class="logo">
+      <div class="logo-icon">Δ</div>
+      DiffPad
+    </div>
+    <div class="title-sep"></div>
+    <div class="diff-stats">
+      <div class="stat-pill add"><span class="dot"></span><span id="stat-add">0</span><span class="stat-label">&nbsp;added</span></div>
+      <div class="stat-pill del"><span class="dot"></span><span id="stat-del">0</span><span class="stat-label">&nbsp;deleted</span></div>
+      <div class="stat-pill mod"><span class="dot"></span><span id="stat-mod">0</span><span class="stat-label">&nbsp;modified</span></div>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div id="toolbar">
+    <button class="tb-btn" id="btn-compare" onclick="runDiff()">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 4h14v1H1zm0 4h10v1H1zm0 4h12v1H1z"/><path d="M13 6l3 2-3 2V6z"/></svg>
+      Compare
+    </button>
+    <button class="tb-btn" onclick="clearAll()">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12l-1 11H3L2 3zm2 1l.8 9h6.4L12 4H4zm3-3h2v1H7V1z"/></svg>
+      Clear
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="swapPanes()">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 5l-3 3 3 3V8h7V7H4V5zm8 0v2H5v1h7v2l3-3-3-3z"/></svg>
+      Swap
+    </button>
+    <button class="tb-btn" id="btn-ignore-ws" onclick="toggleIgnoreWS()">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h1v12H2zm11 0h1v12h-1zM5 7h6v2H5z"/></svg>
+      Ignore WS
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-output-panel" onclick="toggleOutputPanel()">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h14v1H1zm0 3h14v1H1zm0 3h14v1H1zm0 3h9v1H1zm10 0l4 2-4 2v-4z"/></svg>
+      Output
+    </button>
+    <div class="view-toggle">
+      <button class="view-btn active" id="vbtn-split" onclick="setView('split')">Split</button>
+      <button class="view-btn" id="vbtn-unified" onclick="setView('unified')">Unified</button>
+    </div>
+  </div>
+
+  <!-- SIDEBAR (desktop) -->
+  <aside id="sidebar">
+    <div class="sidebar-title">
+      Changes <span class="sidebar-count" id="change-count">0</span>
+    </div>
+    <ul class="diff-nav-list" id="diff-nav"></ul>
+  </aside>
+
+  <!-- MAIN -->
+  <main id="main" style="position:relative;">
+
+    <!-- Loading overlay (shown while worker computes) -->
+    <div id="diff-loading">
+      <div class="loading-spinner"></div>
+      <div class="loading-label">Computing diff…</div>
+    </div>
+
+    <!-- Input view: two editor panes -->
+    <div id="input-view">
+
+      <!-- LEFT / BEFORE -->
+      <div class="editor-pane" id="pane-left"
+           ondragover="onDragOver(event,'left')"
+           ondragleave="onDragLeave('left')"
+           ondrop="onDrop(event,'left')">
+        <div class="pane-header left">
+          <span class="pane-label">Before</span>
+          <span class="pane-filename" id="fname-left">Original</span>
+          <button class="open-btn" onclick="triggerOpen('left')">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h5l1.5 2H15v9H1V3zm1.5 1.5V13h11V6.5H7L5.5 4.5H2.5z"/></svg>
+            Open
+          </button>
+          <span class="line-count" id="lc-left">0 ln</span>
+        </div>
+        <div class="drop-overlay">Drop file here</div>
+        <textarea id="left-editor"
+                  placeholder="Paste text or open / drop a file…"
+                  spellcheck="false"
+                  oninput="updateLineCount('left')"></textarea>
+      </div>
+
+      <div style="width:2px;background:var(--border);flex-shrink:0;"></div>
+
+      <!-- RIGHT / AFTER -->
+      <div class="editor-pane" id="pane-right"
+           ondragover="onDragOver(event,'right')"
+           ondragleave="onDragLeave('right')"
+           ondrop="onDrop(event,'right')">
+        <div class="pane-header right">
+          <span class="pane-label">After</span>
+          <span class="pane-filename" id="fname-right">Modified</span>
+          <button class="open-btn" onclick="triggerOpen('right')">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h5l1.5 2H15v9H1V3zm1.5 1.5V13h11V6.5H7L5.5 4.5H2.5z"/></svg>
+            Open
+          </button>
+          <span class="line-count" id="lc-right">0 ln</span>
+        </div>
+        <div class="drop-overlay">Drop file here</div>
+        <textarea id="right-editor"
+                  placeholder="Paste text or open / drop a file…"
+                  spellcheck="false"
+                  oninput="updateLineCount('right')"></textarea>
+      </div>
+
+    </div>
+
+    <!-- Diff output view -->
+    <div id="diff-view"></div>
+
+    <!-- Output panels (shown when Output toggle is active) -->
+    <div id="output-panels">
+      <div class="output-pane" id="output-pane-left">
+        <div class="output-pane-header">
+          <span class="output-pane-label del-color">ORIGINAL</span>
+          <span class="output-pane-fname" id="output-fname-left">Original</span>
+          <span class="output-merge-hint" id="output-hint-left"></span>
+          <button class="output-copy-btn" onclick="copyOutput('left')" id="copy-btn-left">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2h8v1H4zm-2 2h12v11H2V4zm1 1v9h10V5H3z"/></svg>
+            Copy
+          </button>
+        </div>
+        <div class="output-body">
+          <div class="output-lines" id="output-left"></div>
+        </div>
+      </div>
+      <div class="output-pane-divider"></div>
+      <div class="output-pane" id="output-pane-right">
+        <div class="output-pane-header">
+          <span class="output-pane-label add-color">MODIFIED</span>
+          <span class="output-pane-fname" id="output-fname-right">Modified</span>
+          <span class="output-merge-hint" id="output-hint-right"></span>
+          <button class="output-copy-btn" onclick="copyOutput('right')" id="copy-btn-right">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2h8v1H4zm-2 2h12v11H2V4zm1 1v9h10V5H3z"/></svg>
+            Copy
+          </button>
+        </div>
+        <div class="output-body">
+          <div class="output-lines" id="output-right"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- STATUS BAR -->
+  <footer id="statusbar">
+    <div class="status-item">
+      <span class="status-dot"></span>
+      <span id="status-text">Ready — open files or paste text</span>
+    </div>
+    <span id="status-view-mode" style="display:none">Split View</span>
+    <span id="jump-indicator"></span>
+  </footer>
+
+</div><!-- /#app -->
+
+<!-- Hidden file inputs -->
+<input type="file" id="file-input-left"  accept="*/*" onchange="loadFile(event,'left')">
+<input type="file" id="file-input-right" accept="*/*" onchange="loadFile(event,'right')">
+
+<!-- Floating jump nav -->
+<div class="jump-nav" id="jump-nav">
+  <button class="jump-btn" id="jump-prev" onclick="jumpDiff(-1)" title="Prev diff (Shift+F3)">▲</button>
+  <button class="jump-btn" id="jump-next" onclick="jumpDiff(1)"  title="Next diff (F3)">▼</button>
+</div>
+
+<!-- Mobile bottom sheet -->
+<div id="mobile-sheet">
+  <div id="sheet-backdrop" onclick="closeSheet()"></div>
+  <div id="sheet-panel">
+    <div id="sheet-handle"></div>
+    <div id="sheet-title">
+      <span>Changes <span id="sheet-count">0</span></span>
+      <span style="font-size:10px;color:var(--text-dim);letter-spacing:0">tap to jump</span>
+    </div>
+    <div id="sheet-list"></div>
+  </div>
+</div>
+
+<script src="diffpad.js"></script>
+</body>
+</html>
