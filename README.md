@@ -22,5 +22,3 @@ sudo chmod 644 /var/www/html/diffpad/*
 accessible at `http://YOUR-IP/diffpad`
 
 If you do not want to host locally (which can be done on a Pi 4 2GB) you can use the [online version](https://amec0e.github.io/Diffpad/)
-
-This is free to use and modify as you see fit
