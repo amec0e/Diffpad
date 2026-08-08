@@ -34,6 +34,66 @@ function initWorker() {
 }
 worker = initWorker();
 
+// ── CODEMIRROR INPUT EDITORS ──
+// The Before / After input panes are CodeMirror 6 instances (bundled into
+// codemirror.bundle.js, global `CM`). The rest of the app talks to them only
+// through getEditorValue / setEditorValue, so nothing else needs to know they
+// aren't textareas. The DIFF view remains the original non-editable rendering.
+
+const editors = { left: null, right: null };
+
+// Dark theme matching the DiffPad palette (see :root vars in diffpad.css).
+const cmTheme = CM.EditorView.theme({
+  '&': { color: '#cdd3db', backgroundColor: 'transparent', height: '100%', fontSize: '13px' },
+  '.cm-scroller': { fontFamily: "'JetBrains Mono', monospace", lineHeight: '1.75', overflow: 'auto' },
+  '.cm-content': { caretColor: '#3ecfcf', padding: '10px 0' },
+  '.cm-line': { padding: '0 12px' },
+  '&.cm-focused': { outline: 'none' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#3ecfcf' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+    backgroundColor: 'rgba(62,207,207,0.20)',
+  },
+  '.cm-gutters': { backgroundColor: '#151821', color: '#5a6472', border: 'none', borderRight: '1px solid #252b33' },
+  '.cm-activeLine': { backgroundColor: 'rgba(255,255,255,0.03)' },
+  '.cm-activeLineGutter': { backgroundColor: 'rgba(255,255,255,0.05)', color: '#8993a0' },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 6px', minWidth: '30px' },
+  '.cm-placeholder': { color: '#5a6472', fontSize: '12px' },
+}, { dark: true });
+
+function createEditor(side) {
+  const view = new CM.EditorView({
+    parent: document.getElementById(side + '-cm'),
+    doc: '',
+    extensions: [
+      CM.lineNumbers(),
+      CM.highlightActiveLine(),
+      CM.highlightActiveLineGutter(),
+      CM.drawSelection(),
+      CM.history(),
+      CM.placeholder('Paste text or open / drop a file\u2026'),
+      CM.keymap.of([...CM.defaultKeymap, ...CM.historyKeymap, CM.indentWithTab]),
+      CM.EditorState.tabSize.of(2),
+      CM.EditorView.lineWrapping,
+      cmTheme,
+      CM.EditorView.updateListener.of(u => { if (u.docChanged) updateLineCount(side); }),
+    ],
+  });
+  editors[side] = view;
+  return view;
+}
+
+function getEditorValue(side) {
+  const v = editors[side];
+  return v ? v.state.doc.toString() : '';
+}
+
+function setEditorValue(side, text) {
+  const v = editors[side];
+  if (!v) return;
+  v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text ?? '' } });
+  updateLineCount(side);
+}
+
 // ── LOADING OVERLAY ──
 
 function showLoading() {
@@ -61,9 +121,8 @@ function loadFile(e, side) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    document.getElementById(side + '-editor').value = ev.target.result;
+    setEditorValue(side, ev.target.result);
     document.getElementById('fname-' + side).textContent = file.name;
-    updateLineCount(side);
     e.target.value = '';
   };
   reader.readAsText(file);
@@ -71,6 +130,7 @@ function loadFile(e, side) {
 
 function onDragOver(e, side) {
   e.preventDefault();
+  e.stopPropagation();
   document.getElementById('pane-' + side).classList.add('drag-over');
 }
 
@@ -80,14 +140,14 @@ function onDragLeave(side) {
 
 function onDrop(e, side) {
   e.preventDefault();
+  e.stopPropagation();   // capture-phase: keep the drop from reaching CodeMirror
   document.getElementById('pane-' + side).classList.remove('drag-over');
   const file = e.dataTransfer.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    document.getElementById(side + '-editor').value = ev.target.result;
+    setEditorValue(side, ev.target.result);
     document.getElementById('fname-' + side).textContent = file.name;
-    updateLineCount(side);
   };
   reader.readAsText(file);
 }
@@ -95,7 +155,7 @@ function onDrop(e, side) {
 // ── UTILITIES ──
 
 function updateLineCount(side) {
-  const val = document.getElementById(side + '-editor').value;
+  const val = getEditorValue(side);
   const n = val === '' ? 0 : val.split('\n').length;
   document.getElementById('lc-' + side).textContent = n + ' ln';
 }
@@ -204,8 +264,8 @@ function syncDiff(aLines, bLines) {
 
 function runDiff() {
   if (isComputing) return;
-  const lv = document.getElementById('left-editor').value;
-  const rv = document.getElementById('right-editor').value;
+  const lv = getEditorValue('left');
+  const rv = getEditorValue('right');
   const aLines = lv === '' ? [] : lv.split('\n');
   const bLines = rv === '' ? [] : rv.split('\n');
   showLoading();
@@ -599,10 +659,8 @@ function buildMergedLines(side) {
 function updateEditorPanes() {
   const leftLines  = buildMergedLines('left');
   const rightLines = buildMergedLines('right');
-  document.getElementById('left-editor').value  = leftLines.join('\n');
-  document.getElementById('right-editor').value = rightLines.join('\n');
-  updateLineCount('left');
-  updateLineCount('right');
+  setEditorValue('left',  leftLines.join('\n'));
+  setEditorValue('right', rightLines.join('\n'));
 }
 
 // ── OUTPUT PANEL ──
@@ -1066,8 +1124,8 @@ function clearAll() {
   hunks = [];
   selectedHunkId = null;
 
-  document.getElementById('left-editor').value = '';
-  document.getElementById('right-editor').value = '';
+  setEditorValue('left', '');
+  setEditorValue('right', '');
   document.getElementById('fname-left').textContent = 'Original';
   document.getElementById('fname-right').textContent = 'Modified';
   document.getElementById('input-view').classList.remove('hidden');
@@ -1096,20 +1154,13 @@ function clearAll() {
 }
 
 function swapPanes() {
-  const l = document.getElementById('left-editor');
-  const r = document.getElementById('right-editor');
-  [l.value, r.value] = [r.value, l.value];
+  const lv = getEditorValue('left'), rv = getEditorValue('right');
+  setEditorValue('left', rv);
+  setEditorValue('right', lv);
   const fl = document.getElementById('fname-left');
   const fr = document.getElementById('fname-right');
   [fl.textContent, fr.textContent] = [fr.textContent, fl.textContent];
-  updateLineCount('left');
-  updateLineCount('right');
   if (diffBlocks.length > 0) runDiff();
-}
-
-function toggleIgnoreWS() {
-  ignoreWS = !ignoreWS;
-  document.getElementById('btn-ignore-ws').classList.toggle('active', ignoreWS);
 }
 
 function setView(mode) {
@@ -1128,5 +1179,17 @@ document.addEventListener('keydown', e => {
 });
 
 // ── INIT ──
+createEditor('left');
+createEditor('right');
+
+// File drag/drop: capture-phase on each pane so we preventDefault +
+// stopPropagation before the event reaches CodeMirror.
+['left', 'right'].forEach(side => {
+  const pane = document.getElementById('pane-' + side);
+  pane.addEventListener('dragover',  e => onDragOver(e, side), true);
+  pane.addEventListener('dragleave', () => onDragLeave(side),  true);
+  pane.addEventListener('drop',      e => onDrop(e, side),     true);
+});
+
 updateLineCount('left');
 updateLineCount('right');
