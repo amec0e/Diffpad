@@ -42,10 +42,6 @@
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 5l-3 3 3 3V8h7V7H4V5zm8 0v2H5v1h7v2l3-3-3-3z"/></svg>
       Swap
     </button>
-    <button class="tb-btn" id="btn-ignore-ws" onclick="toggleIgnoreWS()">
-      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h1v12H2zm11 0h1v12h-1zM5 7h6v2H5z"/></svg>
-      Ignore WS
-    </button>
     <div class="tb-sep"></div>
     <button class="tb-btn" id="btn-output-panel" onclick="toggleOutputPanel()">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h14v1H1zm0 3h14v1H1zm0 3h14v1H1zm0 3h9v1H1zm10 0l4 2-4 2v-4z"/></svg>
@@ -78,10 +74,7 @@
     <div id="input-view">
 
       <!-- LEFT / BEFORE -->
-      <div class="editor-pane" id="pane-left"
-           ondragover="onDragOver(event,'left')"
-           ondragleave="onDragLeave('left')"
-           ondrop="onDrop(event,'left')">
+      <div class="editor-pane" id="pane-left">
         <div class="pane-header left">
           <span class="pane-label">Before</span>
           <span class="pane-filename" id="fname-left">Original</span>
@@ -92,19 +85,13 @@
           <span class="line-count" id="lc-left">0 ln</span>
         </div>
         <div class="drop-overlay">Drop file here</div>
-        <textarea id="left-editor"
-                  placeholder="Paste text or open / drop a file…"
-                  spellcheck="false"
-                  oninput="updateLineCount('left')"></textarea>
+        <div class="cm-host" id="left-cm"></div>
       </div>
 
       <div style="width:2px;background:var(--border);flex-shrink:0;"></div>
 
       <!-- RIGHT / AFTER -->
-      <div class="editor-pane" id="pane-right"
-           ondragover="onDragOver(event,'right')"
-           ondragleave="onDragLeave('right')"
-           ondrop="onDrop(event,'right')">
+      <div class="editor-pane" id="pane-right">
         <div class="pane-header right">
           <span class="pane-label">After</span>
           <span class="pane-filename" id="fname-right">Modified</span>
@@ -115,10 +102,7 @@
           <span class="line-count" id="lc-right">0 ln</span>
         </div>
         <div class="drop-overlay">Drop file here</div>
-        <textarea id="right-editor"
-                  placeholder="Paste text or open / drop a file…"
-                  spellcheck="false"
-                  oninput="updateLineCount('right')"></textarea>
+        <div class="cm-host" id="right-cm"></div>
       </div>
 
     </div>
@@ -196,6 +180,7 @@
   </div>
 </div>
 
+<script src="codemirror.bundle.js"></script>
 <script src="diffpad.js"></script>
 </body>
 </html>
