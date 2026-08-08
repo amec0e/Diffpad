@@ -362,21 +362,16 @@ input[type=file] { display: none; }
 }
 .editor-pane.drag-over .drop-overlay { display: flex; }
 
-textarea {
+/* CodeMirror input editors fill the pane below the header */
+.cm-host {
   flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-main);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  line-height: 1.75;
-  padding: 10px 12px;
-  resize: none;
-  outline: none;
-  overflow: auto;
-  tab-size: 2;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
 }
-textarea::placeholder { color: var(--text-dim); font-size: 12px; }
+.cm-host .cm-editor { flex: 1; height: 100%; min-width: 0; background: transparent; }
+.cm-host .cm-editor.cm-focused { outline: none; }
+.cm-host .cm-scroller { -webkit-overflow-scrolling: touch; }
 
 /* ── DIFF VIEW ── */
 #diff-view { flex: 1; overflow: hidden; display: none; flex-direction: column; }
@@ -448,7 +443,7 @@ textarea::placeholder { color: var(--text-dim); font-size: 12px; }
 }
 .dr-gutter-left { border-left: 3px solid transparent; }
 
-/* Cell — split view: wrap at word boundaries */
+/* Cell — split view wraps at word boundaries; unified overrides to no-wrap below */
 .dr-cell {
   flex: 1;
   padding: 2px 12px;
@@ -683,7 +678,7 @@ textarea::placeholder { color: var(--text-dim); font-size: 12px; }
 
   #input-view { flex-direction: column; gap: 2px; }
   .editor-pane { min-height: 120px; }
-  textarea { font-size: 14px; }
+  .cm-host .cm-editor { font-size: 14px; }
 
   #toolbar { padding: 0 8px; }
   .tb-btn { padding: 5px 8px; font-size: 11px; }
@@ -924,7 +919,6 @@ textarea::placeholder { color: var(--text-dim); font-size: 12px; }
 }
 
 .output-lines {
-  min-width: max-content;
   width: 100%;
 }
 
@@ -953,8 +947,11 @@ textarea::placeholder { color: var(--text-dim); font-size: 12px; }
 
 .out-cell {
   flex: 1;
+  min-width: 0;
   padding: 2px 10px;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
   color: var(--text-main);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
